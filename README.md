@@ -16,6 +16,11 @@ bottom-right key goes back.
 **Press an agent → you're there.** cmux is brought to the front with that workspace
 selected and that terminal surface focused.
 
+**Subagents don't get their own key.** A headless `pi -p` child spawned by a session shows
+up as small purple dots trailing that workspace's agent dots, and on the agent key as a
+purple `⤷N` pill plus a subtitle (`⤷ audit the schema`, or `⤷ 3 subagents`). Only sessions
+you can actually sit in front of get a key of their own.
+
 Shortcuts: a workspace with exactly one agent focuses it directly (one press). **Hold** a
 workspace key to jump straight to the workspace without drilling in. The agents view
 returns to the workspace view on its own after ~25s.
@@ -79,6 +84,12 @@ State comes from pi's own lifecycle events (`before_agent_start`, `turn_start`,
 there's no polling of pi internals and no screen scraping. `waiting` decays to `idle` after
 20 minutes; a dead pid reads as `ended` even if the process never got to write its
 tombstone.
+
+Subagent detection needs no cooperation from the subagent extension: the parent stamps its
+session id into `PI_DECK_PARENT`, and because children are `spawn`ed with an inherited
+environment, each child sees it and reports `role: "subagent"` plus its parent's id. A
+headless session (`ctx.hasUI === false`) counts as a subagent even without the marker, and
+one whose parent can't be found is promoted to a key of its own rather than vanishing.
 
 ## Config
 
