@@ -99,6 +99,7 @@ def _workspace_spec(workspace: Workspace, now: float) -> dict:
         "status": workspace.state(now),
         "dots": [a.effective_state(now) for a in agents],
         "count": len(agents),
+        "subagents": workspace.subagent_count(now),
         "age": relative_time(now - last) if last else None,
         "selected": workspace.selected,
         "stuck": workspace.stuck(now),
@@ -136,11 +137,22 @@ def _agents_scene(workspace: Workspace, view: View, key_count: int,
 
 def _agent_spec(agent, now: float) -> dict:
     state = agent.effective_state(now)
+    children = agent.live_children(now)
     return {
         "kind": "agent",
         "title": agent.label,
-        "subtitle": agent.activity or agent.branch,
+        "subtitle": _agent_subtitle(agent, children),
         "status": state,
+        "subagents": len(children),
         "age": relative_time(agent.age_seconds(now)),
         "stuck": agent.stuck(now),
     }
+
+
+def _agent_subtitle(agent, children: list) -> str | None:
+    """Subagents are what the session is really doing, so they win the line."""
+    if children:
+        if len(children) == 1:
+            return f"⤷ {children[0].label}"
+        return f"⤷ {len(children)} subagents"
+    return agent.activity or agent.branch

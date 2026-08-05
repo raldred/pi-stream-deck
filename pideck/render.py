@@ -135,7 +135,7 @@ def paint_key(spec: dict, size=(80, 80), scroll_x=0, marquee=False, pulse=1.0,
     w, h = size
 
     if kind == "blank":
-        return img
+        return Image.new("RGB", size, (0, 0, 0))
     if kind == "banner":
         return paint_banner_cell(spec.get("text", ""), int(spec.get("index", 0)), size)
     if kind == "more":
@@ -190,6 +190,8 @@ def paint_key(spec: dict, size=(80, 80), scroll_x=0, marquee=False, pulse=1.0,
         count = int(spec.get("count", 0) or 0)
         if count:
             _paint_count_badge(draw, count, w, h)
+    elif int(spec.get("subagents", 0) or 0) > 0:
+        _paint_subagent_badge(draw, int(spec["subagents"]), w, h)
     if status in GLYPH_STATUSES:
         _draw_status_glyph(draw, status, w, h)
     return img
@@ -217,22 +219,49 @@ def _paint_back(img, draw, spec, size):
 
 
 def _paint_dots(draw, spec, x0, y, w):
-    """One dot per agent, coloured by state — the glanceable roll-up."""
+    """One dot per top-level pi session, coloured by state — the glanceable
+    roll-up. Subagents trail behind as smaller purple dots, so a busy session
+    with helpers reads differently from three separate sessions."""
     dots = list(spec.get("dots") or [])
+    subagents = int(spec.get("subagents", 0) or 0)
     if not dots:
         draw.text((x0, y - 2), "no agents", font=_font(SUB_SIZE), fill=DIM)
         return
     radius, gap = 4, 5
-    max_dots = max(1, (w - 2 * PAD + gap) // (2 * radius + gap))
+    sub_radius, sub_gap = 2, 4
+    budget = w - 2 * PAD
+    sub_width = subagents * (2 * sub_radius + sub_gap) + (4 if subagents else 0)
+    max_dots = max(1, (budget - sub_width + gap) // (2 * radius + gap))
     shown = dots[:max_dots]
     x = x0
     for status in shown:
-        color = STATUS_COLORS.get(status, DIM)
-        draw.ellipse([x, y, x + 2 * radius, y + 2 * radius], fill=color)
+        draw.ellipse([x, y, x + 2 * radius, y + 2 * radius],
+                     fill=STATUS_COLORS.get(status, DIM))
         x += 2 * radius + gap
     if len(dots) > len(shown):
         draw.text((x, y - 3), f"+{len(dots) - len(shown)}",
                   font=_font(AGE_SIZE), fill=DIM)
+        return
+    if subagents:
+        x += 2
+        mid = y + radius - sub_radius
+        for _ in range(subagents):
+            if x + 2 * sub_radius > w - PAD:
+                break
+            draw.ellipse([x, mid, x + 2 * sub_radius, mid + 2 * sub_radius], fill=ACCENT)
+            x += 2 * sub_radius + sub_gap
+
+
+def _paint_subagent_badge(draw, count, w, h):
+    """A purple pill counting the subagents this session has running."""
+    label = f"⤷{count}"
+    font = _font(SUB_SIZE)
+    tw = draw.textlength(label, font=font)
+    bw, bh = int(tw) + 10, 15
+    x1, y1 = w - PAD + 2, h - PAD + 1
+    x0, y0 = x1 - bw, y1 - bh
+    draw.rounded_rectangle([x0, y0, x1, y1], radius=bh // 2, fill=ACCENT)
+    draw.text((x0 + (bw - tw) / 2, y0 + 1), label, font=font, fill=(255, 255, 255))
 
 
 def _paint_count_badge(draw, count, w, h):

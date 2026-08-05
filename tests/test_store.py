@@ -119,3 +119,15 @@ def test_pulse_dims_the_status_band():
     bright = render.paint_key(spec).getpixel((40, 2))
     dark = render.paint_key(spec, pulse=0.2).getpixel((40, 2))
     assert sum(dark) < sum(bright)
+
+
+def test_render_shows_subagent_badge_and_dots():
+    parent = {"kind": "agent", "title": "residently", "subtitle": "⤷ 2 subagents",
+              "status": "working", "subagents": 2, "age": "now"}
+    assert render.paint_key(parent).size == (80, 80)
+    ws = {"kind": "workspace", "title": "Pi Agent", "status": "working",
+          "dots": ["working", "waiting"], "count": 2, "subagents": 3, "age": "1m"}
+    img = render.paint_key(ws)
+    # the purple accent must appear somewhere in the dot row
+    row = [img.getpixel((x, y)) for x in range(80) for y in (30, 34)]
+    assert render.ACCENT in row

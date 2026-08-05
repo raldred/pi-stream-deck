@@ -130,3 +130,67 @@ def test_agent_key_shows_activity_and_age():
                     View(mode="agents", workspace_id="w-ws"), key_count=6, now=NOW)
     assert keys[0].spec["subtitle"] == "bash: rspec"
     assert keys[0].spec["age"] == "1m"
+
+
+# MARK: - subagents
+
+def sub(parent=None, surface="s1", label="task", state="working"):
+    a = agent(state=state, surface=surface, label=label)
+    a.role = "subagent"
+    a.parent_session_id = parent
+    return a
+
+
+def test_subagents_do_not_take_their_own_key():
+    from pideck.store import attach_subagents
+    main = agent("working", "s1", "residently")
+    agents = attach_subagents([main, sub(main.session_id), sub(main.session_id)])
+    assert [a.session_id for a in agents] == [main.session_id]
+    keys, _ = build([workspace(agents=agents)],
+                    View(mode="agents", workspace_id="w-ws"), key_count=6, now=NOW)
+    assert [k.spec["kind"] for k in keys[:2]] == ["agent", "blank"]
+    assert keys[0].spec["subagents"] == 2
+    assert keys[0].spec["subtitle"] == "⤷ 2 subagents"
+
+
+def test_single_subagent_is_named_on_the_parent_key():
+    from pideck.store import attach_subagents
+    main = agent("working", "s1", "residently")
+    agents = attach_subagents([main, sub(main.session_id, label="audit the schema")])
+    keys, _ = build([workspace(agents=agents)],
+                    View(mode="agents", workspace_id="w-ws"), key_count=6, now=NOW)
+    assert keys[0].spec["subtitle"] == "⤷ audit the schema"
+
+
+def test_subagents_are_matched_by_surface_when_parent_id_is_missing():
+    from pideck.store import attach_subagents
+    main = agent("working", "s1", "residently")
+    agents = attach_subagents([main, sub(None, surface="s1")])
+    assert len(agents) == 1 and len(main.children) == 1
+
+
+def test_orphan_subagent_is_promoted_so_it_stays_visible():
+    from pideck.store import attach_subagents
+    orphan = sub("nobody", surface="s9", label="stray run")
+    agents = attach_subagents([orphan])
+    assert [a.session_id for a in agents] == [orphan.session_id]
+
+
+def test_workspace_key_counts_subagents_separately():
+    from pideck.store import attach_subagents
+    main = agent("working", "s1")
+    agents = attach_subagents([main, sub(main.session_id), sub(main.session_id)])
+    keys, _ = build([workspace(agents=agents)], View(), key_count=6, now=NOW)
+    assert keys[0].spec["count"] == 1
+    assert keys[0].spec["dots"] == ["working"]
+    assert keys[0].spec["subagents"] == 2
+
+
+def test_dead_subagents_stop_counting():
+    from pideck.store import attach_subagents
+    main = agent("working", "s1")
+    dead = sub(main.session_id)
+    dead.pid = 999_999_999
+    agents = attach_subagents([main, dead, sub(main.session_id)])
+    keys, _ = build([workspace(agents=agents)], View(), key_count=6, now=NOW)
+    assert keys[0].spec["subagents"] == 1

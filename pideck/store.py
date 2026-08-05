@@ -41,13 +41,44 @@ def _reap(path: Path, agent: Agent, now: float) -> None:
             pass
 
 
+def attach_subagents(agents: list[Agent]) -> list[Agent]:
+    """Nest subagents under the session that spawned them.
+
+    Parents are matched by the session id the child inherited; failing that, by
+    the cmux surface they share. A subagent with no findable parent (a stray
+    `pi -p` run) is promoted so it still shows up somewhere.
+    """
+    mains = [a for a in agents if a.role != "subagent"]
+    subs = [a for a in agents if a.role == "subagent"]
+    for main in mains:
+        main.children = []
+    by_session = {a.session_id: a for a in mains}
+    by_surface: dict[str, Agent] = {}
+    for main in mains:
+        if main.surface_id:
+            by_surface.setdefault(main.surface_id, main)
+
+    promoted: list[Agent] = []
+    for sub in subs:
+        parent = by_session.get(sub.parent_session_id or "") \
+            or by_surface.get(sub.surface_id or "")
+        if parent is None or parent is sub:
+            promoted.append(sub)
+            continue
+        parent.children.append(sub)
+    return mains + promoted
+
+
 def build_workspaces(topology: cmux.Topology, agents: list[Agent],
                      only_with_agents: bool = False) -> list[Workspace]:
     """cmux workspaces in sidebar order, each carrying its pi agents.
 
-    Agents whose workspace is unknown to cmux (e.g. run outside cmux) are
-    collected into a synthetic trailing workspace so they're never invisible.
+    Subagents are nested under their parent session (see `attach_subagents`), so
+    a workspace's keys only ever show top-level pi sessions. Agents whose
+    workspace is unknown to cmux (e.g. run outside cmux) are collected into a
+    synthetic trailing workspace so they're never invisible.
     """
+    agents = attach_subagents(agents)
     by_workspace: dict[str, list[Agent]] = {}
     for agent in agents:
         by_workspace.setdefault(agent.workspace_id or "", []).append(agent)

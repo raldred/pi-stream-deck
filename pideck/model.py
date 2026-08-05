@@ -71,6 +71,9 @@ class Agent:
     updated_at: float = 0.0
     state_since: float = 0.0
     source: str = ""
+    role: str = "main"                       # "main" | "subagent"
+    parent_session_id: str | None = None
+    children: list["Agent"] = field(default_factory=list)
 
     @classmethod
     def from_json(cls, data: dict, source: str = "") -> "Agent":
@@ -88,7 +91,12 @@ class Agent:
             updated_at=float(data.get("updatedAt") or 0.0),
             state_since=float(data.get("stateSince") or data.get("updatedAt") or 0.0),
             source=source,
+            role=str(data.get("role") or "main"),
+            parent_session_id=data.get("parentSessionId"),
         )
+
+    def live_children(self, now: float | None = None) -> list["Agent"]:
+        return [c for c in self.children if c.effective_state(now) != "ended"]
 
     def effective_state(self, now: float | None = None) -> str:
         """State after time-based decay and liveness checks."""
@@ -132,6 +140,9 @@ class Workspace:
             s = a.effective_state(now)
             out[s] = out.get(s, 0) + 1
         return out
+
+    def subagent_count(self, now: float | None = None) -> int:
+        return sum(len(a.live_children(now)) for a in self.live_agents(now))
 
     def needs_you(self, now: float | None = None) -> int:
         return sum(1 for a in self.live_agents(now)

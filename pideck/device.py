@@ -125,20 +125,34 @@ class Deck:
     # MARK: - scene
 
     def set_scene(self, specs: list[dict]) -> None:
-        """Paint `specs` (one per key). Unchanged keys are left alone so their
-        animation offsets survive status refreshes."""
+        """Paint `specs` (one per key). Keys whose text is unchanged keep their
+        marquee offsets, so a ticking age line never restarts the scroll."""
         with self._lock:
             padded = list(specs[:self.key_count])
             padded += [{"kind": "blank"}] * (self.key_count - len(padded))
             for index, spec in enumerate(padded):
-                if index < len(self._scene) and self._scene[index] == spec:
+                old = self._scene[index] if index < len(self._scene) else None
+                if old == spec:
                     continue
-                self._anim.pop(index, None)
-                self._paint(index, spec)
+                if not self._same_text(old, spec):
+                    self._anim.pop(index, None)
+                self._scene[index] = spec
                 self._animated.discard(index)
                 if self._needs_animation(spec):
                     self._animated.add(index)
+                    self._animate(index, spec, self._frame)   # resume mid-scroll
+                else:
+                    self._paint(index, spec)
             self._scene = padded
+
+    @staticmethod
+    def _same_text(old: dict | None, spec: dict) -> bool:
+        """True when the scrolling lines are identical, so their offsets still
+        apply — only volatile fields (age, dots, pulse) changed."""
+        if old is None:
+            return False
+        return all(old.get(field) == spec.get(field)
+                   for field in ("kind", "title", "subtitle", "status"))
 
     def _needs_animation(self, spec: dict) -> bool:
         title_over, _ = render.title_overflow(spec, self._size)
@@ -148,6 +162,11 @@ class Deck:
     def _paint(self, index: int, spec: dict, scroll_x=0, marquee=False, pulse=1.0,
                sub_scroll_x=0, sub_marquee=False) -> None:
         if not (0 <= index < self.key_count):
+            return
+        if spec.get("kind", "blank") == "blank":
+            # Truly dark, not a faintly-lit dark grey square.
+            with self._lock:
+                self.deck.set_key_image(index, None)
             return
         if not marquee and not sub_marquee and pulse == 1.0:
             marquee, _ = render.title_overflow(spec, self._size)

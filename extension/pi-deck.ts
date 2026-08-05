@@ -7,6 +7,12 @@
  * sessions by workspace, and paints the deck.
  *
  * States: working | waiting | blocked | compacting | idle | ended
+ *
+ * Subagents: the subagent extension spawns children as `pi -p --mode json`,
+ * which inherit this process's env. We stamp our session id into
+ * PI_DECK_PARENT, so any child recognises itself as a subagent and reports who
+ * spawned it — the daemon then nests it under the parent's key instead of
+ * giving it one of its own.
  */
 
 import { execFile } from "node:child_process";
@@ -23,12 +29,17 @@ const HEARTBEAT_MS = 15_000;
 const MIN_WRITE_MS = 200;
 
 type State = "working" | "waiting" | "blocked" | "compacting" | "idle" | "ended";
+type Role = "main" | "subagent";
+
+const PARENT_ENV = "PI_DECK_PARENT";
 
 interface Snapshot {
   v: 1;
   sessionId: string;
   pid: number;
   state: State;
+  role: Role;
+  parentSessionId?: string;
   label: string;
   branch?: string;
   activity?: string;
@@ -57,6 +68,9 @@ export default function (pi: ExtensionAPI) {
   let sessionId = `pid-${process.pid}`;
   let cwd = process.cwd();
   let model: string | undefined;
+  let role: Role = "main";
+  let parentSessionId: string | undefined;
+  let taskLabelled = false;
   let file: string | undefined;
   let heartbeat: NodeJS.Timeout | undefined;
   let lastWrite = 0;
@@ -68,6 +82,8 @@ export default function (pi: ExtensionAPI) {
     sessionId,
     pid: process.pid,
     state,
+    role,
+    parentSessionId,
     label,
     branch,
     activity,
@@ -157,6 +173,11 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     sessionId = ctx.sessionManager?.getSessionId?.() ?? sessionId;
     file = path.join(statusDir(), `${sessionId.replace(/[^\w.-]/g, "_")}.json`);
+    // A session we inherited a parent marker from, or any headless run, is a
+    // helper rather than something you sit in front of.
+    parentSessionId = process.env[PARENT_ENV];
+    role = parentSessionId || ctx.hasUI === false ? "subagent" : "main";
+    process.env[PARENT_ENV] = sessionId;      // children nest under us
     await resolveLabel(ctx);
     setState("idle");
     write(true);
@@ -178,7 +199,13 @@ export default function (pi: ExtensionAPI) {
 
   // MARK: - working
 
-  pi.on("before_agent_start", () => {
+  pi.on("before_agent_start", (event: { prompt?: string }) => {
+    // A subagent's repo name is its parent's; what it was *asked to do* is the
+    // only useful label, and the first prompt is exactly that.
+    if (role === "subagent" && !taskLabelled && event.prompt) {
+      label = summarise(event.prompt);
+      taskLabelled = true;
+    }
     setState("working", "thinking");
   });
 
@@ -216,6 +243,16 @@ export default function (pi: ExtensionAPI) {
     setState("ended", null);
     write(true);
   });
+}
+
+/** First meaningful words of a prompt, for labelling a subagent's key. */
+function summarise(prompt: string): string {
+  const line = prompt
+    .replace(/^\s*Task:\s*/i, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  return (line ?? "subagent").slice(0, 32);
 }
 
 /** A short, human-readable "what is it doing right now" line for the key. */
