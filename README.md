@@ -115,45 +115,6 @@ scripts/install.sh
 
 The generated launch-agent plist is also restricted to your user (`0600`).
 
-## How it works
-
-```text
-pi session ──(extension)──► ~/.pi/agent/pi-stream-deck/status/<sessionId>.json ──┐
-                                                                 ├─► pideck daemon ──► Stream Deck
-cmux ──`cmux tree --all --json`──► workspaces / surfaces ────────┘        │
-                                                                key press ▼
-                                              `cmux rpc surface.focus` / `workspace.select`
-```
-
-- **`extension/pi-deck.ts`** is a pi extension loaded into every session. It writes one
-  small JSON file per session (state, label, branch, current activity) and tags it with the
-  cmux workspace and surface IDs cmux puts in each terminal's environment
-  (`CMUX_WORKSPACE_ID`, `CMUX_SURFACE_ID`). The live cmux topology is authoritative for a
-  surface's workspace, so moving an existing terminal does not strand it under
-  **elsewhere**. Writes are coalesced, plus a 15-second heartbeat so the daemon can tell a
-  live session from a crashed one; `session_shutdown` leaves a tombstone the daemon reaps.
-- **`pideck/`** is the Python daemon. `store.py` joins status files onto the live cmux
-  topology, `layout.py` turns that into six key specs, `render.py` paints them with Pillow,
-  `device.py` talks to the deck and reports short/long presses, `cmux.py` reads topology
-  and issues focus RPCs, and `daemon.py` runs the loop.
-- Sessions running outside cmux are grouped into a trailing **elsewhere** workspace.
-
-State comes from pi's lifecycle events (`before_agent_start`, `turn_start`,
-`tool_execution_start`, `tool_execution_end`, `agent_settled`, `session_before_compact`,
-`session_shutdown`), so there is no polling of pi internals and no screen scraping.
-`waiting` decays to `idle` after 20 minutes; a dead pid reads as `ended` even if the process
-never wrote its tombstone.
-
-Subagent detection needs no cooperation from the subagent extension: the parent stamps its
-session id into `PI_DECK_PARENT`, and children inherit it through their environment. Each
-headless child reports `role: "subagent"` plus its parent's id. Interactive sessions remain
-top-level after `/reload` or session replacement. A headless session without a marker still
-counts as a subagent, and one whose parent cannot be found is promoted to a key of its own
-rather than vanishing.
-
-All session status and configuration stays on the local machine. The project makes no
-network requests.
-
 ## Configuration
 
 Configuration is optional. By default, pi-stream-deck uses a brightness of 60%, shows all
@@ -164,28 +125,14 @@ See the **[configuration guide](docs/configuration.md)** for every setting, file
 rules, environment variables, password-protected cmux sockets, restarting the daemon, and
 troubleshooting.
 
-## Development
+## Documentation
 
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests -q
-
-pi-deck status                          # joined model as JSON
-pi-deck scene                           # key specs for the workspaces view
-pi-deck scene agents <workspace-uuid>   # key specs for an agents view
-pi-deck selftest                        # paint a demo scene on the device
-```
-
-The test suite covers the model, layout, status store, rendering, device protocol, and
-daemon topology handling without requiring hardware.
-
-By default, data lives under `~/.pi/agent/pi-stream-deck`. The extension respects
-`PI_CODING_AGENT_DIR` when Pi's agent directory has been relocated. `PI_DECK_HOME` takes
-precedence and relocates only pi-stream-deck's status, config, and logs, which is useful
-when testing against fake sessions.
-
-Contributions and bug reports are welcome through GitHub issues and pull requests.
+- **[Configuration](docs/configuration.md)** — settings, data locations, environment
+  variables, cmux authentication, and troubleshooting.
+- **[How it works](docs/how-it-works.md)** — architecture, session reporting, topology,
+  subagents, rendering, and input handling.
+- **[Contributing](CONTRIBUTING.md)** — development setup, tests, hardware testing, and pull
+  request guidance.
 
 ## License
 
