@@ -15,7 +15,7 @@ usage() {
 }
 
 case "${1:-}" in
-  ""|--launchd) ;; # --launchd remains accepted for backwards compatibility.
+  "") ;;
   --no-launchd) INSTALL_LAUNCHD=false ;;
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
