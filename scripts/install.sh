@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs pi-deck: hidapi, Python venv, pi extension link, and a launchd agent.
+# Installs pi-deck: Pi package, hidapi, Python venv, CLI, and a launchd agent.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,6 +7,8 @@ VENV="$ROOT/.venv"
 AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
 DATA_DIR="${PI_DECK_HOME:-$AGENT_DIR/pi-stream-deck}"
 EXT_DIR="$AGENT_DIR/extensions"
+VERSION="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$ROOT/package.json")"
+PACKAGE_SOURCE="git:github.com/raldred/pi-stream-deck@v$VERSION"
 PLIST="$HOME/Library/LaunchAgents/com.pideck.agent.plist"
 LABEL="com.pideck.agent"
 INSTALL_LAUNCHD=true
@@ -24,6 +26,10 @@ case "${1:-}" in
 esac
 [[ $# -le 1 ]] || { usage >&2; exit 2; }
 
+if ! command -v pi >/dev/null 2>&1; then
+  echo "!! Pi is required: https://github.com/earendil-works/pi-coding-agent" >&2
+  exit 1
+fi
 if ! command -v brew >/dev/null 2>&1; then
   echo "!! Homebrew is required: https://brew.sh" >&2
   exit 1
@@ -38,9 +44,13 @@ python3 -m venv "$VENV"
 "$VENV/bin/pip" install --quiet --upgrade pip
 "$VENV/bin/pip" install --quiet -r "$ROOT/requirements.txt"
 
-echo "==> pi extension -> $EXT_DIR/pi-deck.ts"
-mkdir -p "$EXT_DIR"
-ln -sf "$ROOT/extension/pi-deck.ts" "$EXT_DIR/pi-deck.ts"
+echo "==> Pi package $PACKAGE_SOURCE"
+pi install "$PACKAGE_SOURCE"
+# Remove the pre-release development symlink if this checkout created it.
+LEGACY_EXTENSION="$EXT_DIR/pi-deck.ts"
+if [[ -L "$LEGACY_EXTENSION" && "$(readlink "$LEGACY_EXTENSION")" == "$ROOT/extension/pi-deck.ts" ]]; then
+  rm "$LEGACY_EXTENSION"
+fi
 
 echo "==> CLI -> $HOME/.local/bin/pi-deck"
 mkdir -p "$HOME/.local/bin"

@@ -80,9 +80,10 @@ cd pi-stream-deck
 scripts/install.sh
 ```
 
-The installer installs `hidapi` with Homebrew, creates a project-local Python virtual
-environment, links the pi extension into `~/.pi/agent/extensions/`, links `pi-deck` into
-`~/.local/bin/`, and creates a launch agent so the daemon starts automatically.
+The installer installs the matching tagged release as a Pi package, installs `hidapi` with
+Homebrew, creates a project-local Python virtual environment, links `pi-deck` into
+`~/.local/bin/`, and creates a launch agent so the daemon starts automatically. Pinning the
+extension to the release keeps normal installations separate from a development checkout.
 
 To install without the launch agent and run the daemon yourself:
 

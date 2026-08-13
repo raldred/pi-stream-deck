@@ -47,6 +47,7 @@ pi-deck status
 | `pideck/` | Python daemon, model, layout, rendering, and device integration |
 | `tests/` | Hardware-free pytest suite |
 | `scripts/install.sh` | User installation and launchd setup |
+| `package.json` | Pi package manifest and release version |
 | `assets/` | README preview images |
 | `docs/` | User configuration and architecture documentation |
 
@@ -90,7 +91,16 @@ Restore the normal launchd installation afterwards with:
 scripts/install.sh
 ```
 
-Use a new Pi session or run `/reload` after changing `extension/pi-deck.ts`.
+The normal installer pins the extension to a tagged release. To test local changes to
+`extension/pi-deck.ts`, remove the installed package temporarily and load the file directly:
+
+```sh
+pi remove git:github.com/raldred/pi-stream-deck
+pi -e ./extension/pi-deck.ts
+```
+
+Start a new Pi process after each extension change, or use `/reload`. Run
+`scripts/install.sh` afterwards to restore the release package.
 
 ## Pull requests
 
