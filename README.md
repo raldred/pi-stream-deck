@@ -74,16 +74,35 @@ tested.
 
 ## Install
 
+pi-stream-deck has two parts: a standard Pi extension that reports session state and a
+companion Python daemon that drives the hardware.
+
+### Pi extension only
+
+Install the released extension using Pi's package manager:
+
 ```sh
-git clone https://github.com/raldred/pi-stream-deck.git
+pi install git:github.com/raldred/pi-stream-deck@v0.0.1
+```
+
+This is the standard way to add the extension to Pi. On its own, it writes session status
+but does not drive a Stream Deck.
+
+### Complete Stream Deck setup
+
+The daemon, CLI, Python environment, and launchd service also need files from the release,
+so the complete setup uses a release checkout:
+
+```sh
+git clone --branch v0.0.1 --depth 1 https://github.com/raldred/pi-stream-deck.git
 cd pi-stream-deck
 scripts/install.sh
 ```
 
-The installer installs the matching tagged release as a Pi package, installs `hidapi` with
-Homebrew, creates a project-local Python virtual environment, links `pi-deck` into
-`~/.local/bin/`, and creates a launch agent so the daemon starts automatically. Pinning the
-extension to the release keeps normal installations separate from a development checkout.
+The installer runs the same `pi install` command for the matching release, installs
+`hidapi` with Homebrew, creates a project-local Python virtual environment, links `pi-deck`
+into `~/.local/bin/`, and creates a launch agent so the daemon starts automatically. The
+checkout is for the companion daemon—not for loading the Pi extension directly.
 
 To install without the launch agent and run the daemon yourself:
 
@@ -98,7 +117,7 @@ pi-deck doctor    # deck? cmux? any sessions reporting?
 pi-deck run -v    # drive the deck in the foreground (if not using launchd)
 ```
 
-Start a **new** pi session for the extension to load; `/reload` also works in an existing
+Start a **new** Pi session for the extension to load; `/reload` also works in an existing
 session. The Stream Deck can only be driven by one app at a time, so quit Elgato's Stream
 Deck app (and any other app controlling the device) first.
 
