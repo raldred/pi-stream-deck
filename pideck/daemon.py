@@ -27,6 +27,9 @@ DEFAULTS = {
     "only_with_agents": False,     # hide cmux workspaces with no pi sessions
     "focus_single_agent_directly": True,
     "reconnect_interval": 3.0,
+    "topology_grace": 20.0,        # keep the last good topology at most this long
+                                   # after cmux goes unreachable, then drop it so
+                                   # closed workspaces can't linger as phantoms
 }
 
 
@@ -51,7 +54,9 @@ class Daemon:
         self._stop = threading.Event()
         self._actions: list[dict | None] = []
         self._topology: cmux.Topology | None = None
-        self._topology_at = 0.0
+        self._topology_at = 0.0          # monotonic time of the last attempt
+        self._topology_ok_at = 0.0       # monotonic time of the last success
+        self._topology_failing = False   # are we in a run of failed fetches?
         self._last_press = 0.0
 
     # MARK: - run loop
@@ -102,12 +107,26 @@ class Daemon:
         now = time.monotonic()
         stale = now - self._topology_at > float(self.config["topology_interval"])
         if force or stale or self._topology is None:
+            self._topology_at = now
             try:
                 self._topology = cmux.topology()
-                self._topology_at = now
+                self._topology_ok_at = now
+                if self._topology_failing:
+                    log.info("cmux topology recovered")
+                    self._topology_failing = False
             except cmux.CmuxError as exc:
-                log.debug("cmux topology unavailable: %s", exc)
-                if self._topology is None:
+                # Log once per outage (WARNING so it reaches the file log), not
+                # every poll.
+                if not self._topology_failing:
+                    log.warning("cmux topology unavailable: %s", exc)
+                    self._topology_failing = True
+                # Serving a frozen snapshot forever is what strands live
+                # sessions under "elsewhere" and leaves closed workspaces on the
+                # deck as phantoms. Once cmux has been unreachable past the
+                # grace window, drop the stale topology entirely.
+                grace = float(self.config["topology_grace"])
+                expired = now - self._topology_ok_at > grace
+                if self._topology is None or expired:
                     self._topology = cmux.Topology({})
         return self._topology
 

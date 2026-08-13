@@ -18,7 +18,8 @@ from __future__ import annotations
 from PIL import Image, ImageDraw, ImageFont
 
 STATUS_COLORS = {
-    "blocked": (220, 60, 60),      # red — blocked on a prompt
+    "blocked": (220, 60, 60),      # red — blocked on a permission prompt
+    "question": (235, 150, 40),    # amber — waiting for an answer
     "waiting": (235, 150, 40),     # amber — finished its turn, your move
     "idle": (205, 180, 70),        # gold — alive but stale
     "compacting": (70, 130, 220),  # blue — compacting context
@@ -26,8 +27,8 @@ STATUS_COLORS = {
     "ended": (70, 70, 70),         # grey tombstone
     "empty": (52, 52, 58),         # grey — workspace with no pi agents
 }
-NEEDS_YOU = frozenset({"blocked", "waiting", "idle"})
-GLYPH_STATUSES = frozenset({"blocked", "waiting", "idle", "compacting"})
+NEEDS_YOU = frozenset({"blocked", "question", "waiting", "idle"})
+GLYPH_STATUSES = frozenset({"blocked", "question", "waiting", "idle", "compacting"})
 GLYPH_GUTTER = 16
 
 BG = (24, 24, 27)
@@ -282,6 +283,9 @@ def _draw_status_glyph(draw, status, w, h):
     if status == "blocked":                     # padlock
         draw.arc([x0 + 3, y0, x1 - 3, y0 + 11], start=180, end=360, fill=white, width=2)
         draw.rectangle([x0 + 1, y0 + 6, x1 - 1, y0 + 14], fill=white)
+    elif status == "question":                  # question mark
+        font = _font(16)
+        draw.text((x0 + 3, y0 - 5), "?", font=font, fill=white)
     elif status == "waiting":                   # checkmark
         draw.line([(x0 + 1, y0 + 7), (x0 + 5, y0 + 12), (x1, y0 + 1)], fill=white, width=2)
     elif status == "idle":                      # ellipsis

@@ -13,14 +13,15 @@ from dataclasses import dataclass, field
 # Ordered worst-first: the workspace roll-up shows the most attention-hungry
 # state among its agents.
 STATE_PRIORITY = (
-    "blocked",     # blocked on a prompt/permission — you must answer
+    "blocked",     # blocked on a permission prompt — you must answer
+    "question",    # waiting for an answer to an agent-authored question
     "waiting",     # finished its turn, waiting on you
     "idle",        # alive but has done nothing for a while
     "compacting",  # compacting context
     "working",     # busy, leave it alone
     "ended",       # session gone
 )
-NEEDS_YOU = frozenset({"blocked", "waiting", "idle"})
+NEEDS_YOU = frozenset({"blocked", "question", "waiting", "idle"})
 BUSY = frozenset({"working", "compacting"})
 
 # A "waiting" agent left this long becomes stuck (faster, darker blink).

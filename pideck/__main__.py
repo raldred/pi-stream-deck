@@ -72,7 +72,7 @@ def cmd_selftest(seconds: float = 8.0) -> int:
         {"kind": "workspace", "title": "porch", "status": "blocked",
          "dots": ["blocked", "working"], "count": 2, "age": "7m", "stuck": True},
         {"kind": "workspace", "title": "~", "status": "empty", "dots": [], "count": 0},
-        {"kind": "agent", "title": "residently", "subtitle": "bash: rspec",
+        {"kind": "agent", "title": "my-project", "subtitle": "bash: pytest",
          "status": "working", "age": "now"},
         {"kind": "back", "title": "Pi Agent"},
     ]

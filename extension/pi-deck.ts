@@ -6,7 +6,7 @@
  * cmux sets in every terminal). The daemon watches that directory, groups
  * sessions by workspace, and paints the deck.
  *
- * States: working | waiting | blocked | compacting | idle | ended
+ * States: working | question | waiting | blocked | compacting | idle | ended
  *
  * Subagents: the subagent extension spawns children as `pi -p --mode json`,
  * which inherit this process's env. We stamp our session id into
@@ -28,10 +28,11 @@ const exec = promisify(execFile);
 const HEARTBEAT_MS = 15_000;
 const MIN_WRITE_MS = 200;
 
-type State = "working" | "waiting" | "blocked" | "compacting" | "idle" | "ended";
+type State = "working" | "question" | "waiting" | "blocked" | "compacting" | "idle" | "ended";
 type Role = "main" | "subagent";
 
 const PARENT_ENV = "PI_DECK_PARENT";
+const USER_INPUT_TOOLS = new Set(["ask_user", "ask_user_form"]);
 
 interface Snapshot {
   v: 1;
@@ -173,11 +174,18 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     sessionId = ctx.sessionManager?.getSessionId?.() ?? sessionId;
     file = path.join(statusDir(), `${sessionId.replace(/[^\w.-]/g, "_")}.json`);
-    // A session we inherited a parent marker from, or any headless run, is a
-    // helper rather than something you sit in front of.
-    parentSessionId = process.env[PARENT_ENV];
-    role = parentSessionId || ctx.hasUI === false ? "subagent" : "main";
-    process.env[PARENT_ENV] = sessionId;      // children nest under us
+    // UI sessions are always top-level. PI_DECK_PARENT lives in process.env so
+    // it survives /reload and session replacement; treating that stale marker
+    // as authoritative would make an interactive Harness session its own
+    // subagent. Headless children inherit the marker from their UI parent.
+    const inheritedParent = process.env[PARENT_ENV];
+    role = ctx.hasUI === false ? "subagent" : "main";
+    parentSessionId = role === "subagent" && inheritedParent !== sessionId
+      ? inheritedParent
+      : undefined;
+    // Descendants of a headless helper should remain attached to the top-level
+    // UI session rather than to a parent which has no key of its own.
+    process.env[PARENT_ENV] = parentSessionId ?? sessionId;
     await resolveLabel(ctx);
     setState("idle");
     write(true);
@@ -214,10 +222,18 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("tool_execution_start", (event: { toolName?: string; input?: Record<string, unknown> }) => {
+    if (event.toolName && USER_INPUT_TOOLS.has(event.toolName)) {
+      setState("question", "waiting for your answer");
+      return;
+    }
     setState("working", describeTool(event));
   });
 
-  pi.on("tool_execution_end", () => {
+  pi.on("tool_execution_end", (event: { toolName?: string }) => {
+    if (event.toolName && USER_INPUT_TOOLS.has(event.toolName)) {
+      setState("working", "thinking");
+      return;
+    }
     if (state === "working") setState("working", "thinking");
   });
 

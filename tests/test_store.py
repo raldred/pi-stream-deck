@@ -17,7 +17,7 @@ TREE = {
                     "panes": [{
                         "id": "P1",
                         "surfaces": [
-                            {"id": "S1", "title": "π - residently", "type": "terminal"},
+                            {"id": "S1", "title": "π - my-project", "type": "terminal"},
                             {"id": "S2", "title": "π - porch", "type": "terminal"},
                         ],
                     }],
@@ -70,6 +70,14 @@ def test_build_workspaces_joins_agents_in_tab_order(tmp_path):
     assert workspaces[1].agents == []
 
 
+def test_live_surface_location_overrides_stale_reported_workspace(tmp_path):
+    write_status(tmp_path, "moved", cmux={"workspaceId": "OLD", "surfaceId": "S1"})
+    workspaces = store.build_workspaces(cmux.Topology(TREE),
+                                        store.read_agents(tmp_path, now=1e9))
+    assert [a.session_id for a in workspaces[0].agents] == ["moved"]
+    assert all(w.title != "elsewhere" for w in workspaces)
+
+
 def test_build_workspaces_can_hide_empty_ones(tmp_path):
     write_status(tmp_path, "one")
     workspaces = store.build_workspaces(cmux.Topology(TREE),
@@ -94,8 +102,10 @@ def test_paint_key_returns_correct_size_for_every_kind():
         {"kind": "workspace", "title": "Pi Agent", "status": "waiting",
          "dots": ["working", "waiting"], "count": 2, "age": "2m", "selected": True},
         {"kind": "workspace", "title": "empty ws", "status": "empty", "dots": []},
-        {"kind": "agent", "title": "residently", "subtitle": "bash: rspec",
+        {"kind": "agent", "title": "my-project", "subtitle": "bash: pytest",
          "status": "working", "age": "now"},
+        {"kind": "agent", "title": "my-project", "subtitle": "waiting for your answer",
+         "status": "question", "age": "now"},
         {"kind": "agent", "title": "a very long repository name here",
          "subtitle": "an equally long activity line", "status": "blocked", "age": "9m"},
         {"kind": "back", "title": "Pi Agent"},
@@ -121,8 +131,14 @@ def test_pulse_dims_the_status_band():
     assert sum(dark) < sum(bright)
 
 
+def test_question_status_has_a_distinct_glyph_from_turn_done():
+    question = render.paint_key({"kind": "agent", "title": "x", "status": "question"})
+    waiting = render.paint_key({"kind": "agent", "title": "x", "status": "waiting"})
+    assert question.crop((60, 5, 80, 25)).tobytes() != waiting.crop((60, 5, 80, 25)).tobytes()
+
+
 def test_render_shows_subagent_badge_and_dots():
-    parent = {"kind": "agent", "title": "residently", "subtitle": "⤷ 2 subagents",
+    parent = {"kind": "agent", "title": "my-project", "subtitle": "⤷ 2 subagents",
               "status": "working", "subagents": 2, "age": "now"}
     assert render.paint_key(parent).size == (80, 80)
     ws = {"kind": "workspace", "title": "Pi Agent", "status": "working",

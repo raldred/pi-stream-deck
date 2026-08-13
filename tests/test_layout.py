@@ -24,7 +24,8 @@ def workspace(title="ws", agents=None, wid=None, index=0, selected=False):
 
 def test_worst_prefers_attention_states():
     assert worst(["working", "waiting", "compacting"]) == "waiting"
-    assert worst(["working", "blocked", "waiting"]) == "blocked"
+    assert worst(["working", "question", "waiting"]) == "question"
+    assert worst(["working", "blocked", "question"]) == "blocked"
     assert worst([]) == "empty"
 
 
@@ -83,6 +84,18 @@ def test_workspace_key_shows_dots_and_rollup():
     assert spec["count"] == 2
 
 
+def test_question_overrides_lower_priority_workspace_statuses():
+    ws = workspace(agents=[
+        agent("working", "s1"),
+        agent("waiting", "s2"),
+        agent("question", "s3"),
+    ])
+    keys, _ = build([ws], View(), key_count=6, now=NOW)
+    spec = keys[0].spec
+    assert spec["status"] == "question"
+    assert spec["dots"] == ["working", "waiting", "question"]
+
+
 def test_empty_workspace_renders_grey_with_no_agents():
     keys, _ = build([workspace()], View(), key_count=6, now=NOW)
     assert keys[0].spec["status"] == "empty"
@@ -125,10 +138,10 @@ def test_agents_view_falls_back_when_workspace_disappears():
 
 def test_agent_key_shows_activity_and_age():
     a = agent("working", since=NOW - 90)
-    a.activity = "bash: rspec"
+    a.activity = "bash: pytest"
     keys, _ = build([workspace(agents=[a])],
                     View(mode="agents", workspace_id="w-ws"), key_count=6, now=NOW)
-    assert keys[0].spec["subtitle"] == "bash: rspec"
+    assert keys[0].spec["subtitle"] == "bash: pytest"
     assert keys[0].spec["age"] == "1m"
 
 
@@ -143,7 +156,7 @@ def sub(parent=None, surface="s1", label="task", state="working"):
 
 def test_subagents_do_not_take_their_own_key():
     from pideck.store import attach_subagents
-    main = agent("working", "s1", "residently")
+    main = agent("working", "s1", "my-project")
     agents = attach_subagents([main, sub(main.session_id), sub(main.session_id)])
     assert [a.session_id for a in agents] == [main.session_id]
     keys, _ = build([workspace(agents=agents)],
@@ -155,7 +168,7 @@ def test_subagents_do_not_take_their_own_key():
 
 def test_single_subagent_is_named_on_the_parent_key():
     from pideck.store import attach_subagents
-    main = agent("working", "s1", "residently")
+    main = agent("working", "s1", "my-project")
     agents = attach_subagents([main, sub(main.session_id, label="audit the schema")])
     keys, _ = build([workspace(agents=agents)],
                     View(mode="agents", workspace_id="w-ws"), key_count=6, now=NOW)
@@ -164,7 +177,7 @@ def test_single_subagent_is_named_on_the_parent_key():
 
 def test_subagents_are_matched_by_surface_when_parent_id_is_missing():
     from pideck.store import attach_subagents
-    main = agent("working", "s1", "residently")
+    main = agent("working", "s1", "my-project")
     agents = attach_subagents([main, sub(None, surface="s1")])
     assert len(agents) == 1 and len(main.children) == 1
 
@@ -174,6 +187,19 @@ def test_orphan_subagent_is_promoted_so_it_stays_visible():
     orphan = sub("nobody", surface="s9", label="stray run")
     agents = attach_subagents([orphan])
     assert [a.session_id for a in agents] == [orphan.session_id]
+
+
+def test_self_parented_harness_session_is_recovered_as_the_main_session():
+    from pideck.store import attach_subagents
+    harness = sub(surface="s1", label="Harness")
+    harness.parent_session_id = harness.session_id
+    reviewer = sub(harness.session_id, surface="s1", label="reviewer")
+    reviewer.session_id = "sess-reviewer"
+
+    agents = attach_subagents([harness, reviewer])
+
+    assert agents == [harness]
+    assert harness.children == [reviewer]
 
 
 def test_workspace_key_counts_subagents_separately():

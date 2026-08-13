@@ -48,8 +48,22 @@ def attach_subagents(agents: list[Agent]) -> list[Agent]:
     the cmux surface they share. A subagent with no findable parent (a stray
     `pi -p` run) is promoted so it still shows up somewhere.
     """
-    mains = [a for a in agents if a.role != "subagent"]
-    subs = [a for a in agents if a.role == "subagent"]
+    # Older extension versions could misclassify an interactive session after
+    # /reload: PI_DECK_PARENT had been set to that session's own id, producing
+    # an impossible self-parent relationship. Treat it as the main session so
+    # its real children still nest beneath it instead of becoming peer keys.
+    normal_mains = [a for a in agents if a.role != "subagent"]
+    normal_main_ids = {a.session_id for a in normal_mains}
+
+    def is_main(agent: Agent) -> bool:
+        self_parented = (
+            agent.parent_session_id == agent.session_id
+            and agent.session_id not in normal_main_ids
+        )
+        return agent.role != "subagent" or self_parented
+
+    mains = [a for a in agents if is_main(a)]
+    subs = [a for a in agents if not is_main(a)]
     for main in mains:
         main.children = []
     by_session = {a.session_id: a for a in mains}
@@ -81,7 +95,12 @@ def build_workspaces(topology: cmux.Topology, agents: list[Agent],
     agents = attach_subagents(agents)
     by_workspace: dict[str, list[Agent]] = {}
     for agent in agents:
-        by_workspace.setdefault(agent.workspace_id or "", []).append(agent)
+        # A surface can be moved to another workspace after its terminal starts.
+        # cmux's environment still contains the original workspace ID, so prefer
+        # the live topology whenever the reported surface is still present.
+        surface = topology.surfaces.get(agent.surface_id or "")
+        workspace_id = surface["workspace_id"] if surface else agent.workspace_id
+        by_workspace.setdefault(workspace_id or "", []).append(agent)
 
     workspaces: list[Workspace] = []
     for index, ws in enumerate(topology.workspaces):

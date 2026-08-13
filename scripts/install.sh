@@ -29,6 +29,13 @@ mkdir -p "$HOME/.pi-deck/status"
 
 if [[ "${1:-}" == "--launchd" ]]; then
   echo "==> launchd agent $LABEL"
+  CMUX_PASSWORD_XML=""
+  if [[ -f "$HOME/.pi-deck/cmux-password" ]]; then
+    # Escape plist metacharacters so passwords containing &, <, >, or quotes
+    # still produce valid XML.
+    CMUX_PASSWORD="$(python3 -c 'import html, sys; print(html.escape(sys.stdin.read(), quote=True), end="")' < "$HOME/.pi-deck/cmux-password")"
+    CMUX_PASSWORD_XML="<key>CMUX_SOCKET_PASSWORD</key><string>$CMUX_PASSWORD</string>"
+  fi
   cat > "$PLIST" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -42,7 +49,10 @@ if [[ "${1:-}" == "--launchd" ]]; then
   </array>
   <key>WorkingDirectory</key><string>$ROOT</string>
   <key>EnvironmentVariables</key>
-  <dict><key>HOMEBREW_PREFIX</key><string>$(brew --prefix 2>/dev/null || echo /opt/homebrew)</string></dict>
+  <dict>
+    <key>HOMEBREW_PREFIX</key><string>$(brew --prefix 2>/dev/null || echo /opt/homebrew)</string>
+    $CMUX_PASSWORD_XML
+  </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardErrorPath</key><string>$HOME/.pi-deck/launchd.err.log</string>
@@ -50,6 +60,7 @@ if [[ "${1:-}" == "--launchd" ]]; then
 </dict>
 </plist>
 PLISTEOF
+  chmod 600 "$PLIST"
   launchctl unload "$PLIST" 2>/dev/null || true
   launchctl load "$PLIST"
   echo "    loaded — logs in ~/.pi-deck/"
