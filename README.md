@@ -53,7 +53,7 @@ returns to the workspace view on its own after about 25 seconds.
 - [pi](https://github.com/earendil-works/pi-coding-agent)
 - [cmux](https://cmux.com)
 - Python 3
-- Homebrew and `hidapi`: `brew install hidapi`
+- [Homebrew](https://brew.sh) (the installer uses it to install `hidapi`)
 
 The layout and rendering code assumes six keys. Other Stream Deck models have not yet been
 tested.
@@ -63,13 +63,18 @@ tested.
 ```sh
 git clone https://github.com/raldred/pi-stream-deck.git
 cd pi-stream-deck
-brew install hidapi
-scripts/install.sh --launchd
+scripts/install.sh
 ```
 
-The installer creates a project-local Python virtual environment, links the pi extension
-into `~/.pi/agent/extensions/`, links `pi-deck` into `~/.local/bin/`, and optionally creates
-a launch agent. Omit `--launchd` if you would rather run the daemon yourself.
+The installer installs `hidapi` with Homebrew, creates a project-local Python virtual
+environment, links the pi extension into `~/.pi/agent/extensions/`, links `pi-deck` into
+`~/.local/bin/`, and creates a launch agent so the daemon starts automatically.
+
+To install without the launch agent and run the daemon yourself:
+
+```sh
+scripts/install.sh --no-launchd
+```
 
 Make sure `~/.local/bin` is on your `PATH`, then check the installation:
 
@@ -85,13 +90,13 @@ Deck app (and any other app controlling the device) first.
 ### Password-protected cmux sockets
 
 If cmux requires `CMUX_SOCKET_PASSWORD`, put only the password in
-`~/.pi-deck/cmux-password` before running `scripts/install.sh --launchd`:
+`~/.pi-deck/cmux-password` before running `scripts/install.sh`:
 
 ```sh
 mkdir -p ~/.pi-deck
 printf '%s' "$CMUX_SOCKET_PASSWORD" > ~/.pi-deck/cmux-password
 chmod 600 ~/.pi-deck/cmux-password
-scripts/install.sh --launchd
+scripts/install.sh
 ```
 
 The generated launch-agent plist is also restricted to your user (`0600`).

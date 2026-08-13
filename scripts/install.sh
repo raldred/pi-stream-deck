@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs pi-deck: python venv, pi extension link, and (optionally) a launchd agent.
+# Installs pi-deck: hidapi, Python venv, pi extension link, and a launchd agent.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -7,15 +7,34 @@ VENV="$ROOT/.venv"
 EXT_DIR="$HOME/.pi/agent/extensions"
 PLIST="$HOME/Library/LaunchAgents/com.pideck.agent.plist"
 LABEL="com.pideck.agent"
+INSTALL_LAUNCHD=true
+
+usage() {
+  echo "Usage: scripts/install.sh [--no-launchd]"
+  echo "  --no-launchd  install without starting the daemon at login"
+}
+
+case "${1:-}" in
+  ""|--launchd) ;; # --launchd remains accepted for backwards compatibility.
+  --no-launchd) INSTALL_LAUNCHD=false ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
+
+if ! command -v brew >/dev/null 2>&1; then
+  echo "!! Homebrew is required: https://brew.sh" >&2
+  exit 1
+fi
+if ! brew --prefix hidapi >/dev/null 2>&1; then
+  echo "==> installing hidapi with Homebrew"
+  brew install hidapi
+fi
 
 echo "==> python venv"
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --quiet --upgrade pip
 "$VENV/bin/pip" install --quiet -r "$ROOT/requirements.txt"
-
-if ! brew --prefix hidapi >/dev/null 2>&1; then
-  echo "!! hidapi not found — run: brew install hidapi" >&2
-fi
 
 echo "==> pi extension -> $EXT_DIR/pi-deck.ts"
 mkdir -p "$EXT_DIR"
@@ -27,7 +46,7 @@ ln -sf "$ROOT/bin/pi-deck" "$HOME/.local/bin/pi-deck"
 
 mkdir -p "$HOME/.pi-deck/status"
 
-if [[ "${1:-}" == "--launchd" ]]; then
+if [[ "$INSTALL_LAUNCHD" == true ]]; then
   echo "==> launchd agent $LABEL"
   CMUX_PASSWORD_XML=""
   if [[ -f "$HOME/.pi-deck/cmux-password" ]]; then
@@ -69,5 +88,9 @@ fi
 echo
 echo "Done. Next:"
 echo "  pi-deck doctor        # check deck + cmux + reporting sessions"
-echo "  pi-deck run -v        # drive the deck in the foreground"
+if [[ "$INSTALL_LAUNCHD" == true ]]; then
+  echo "  daemon runs automatically — logs are in ~/.pi-deck/"
+else
+  echo "  pi-deck run -v        # drive the deck in the foreground"
+fi
 echo "  (start a NEW pi session so the extension loads)"
