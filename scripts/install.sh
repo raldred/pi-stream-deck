@@ -4,7 +4,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$ROOT/.venv"
-EXT_DIR="$HOME/.pi/agent/extensions"
+AGENT_DIR="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+DATA_DIR="${PI_DECK_HOME:-$AGENT_DIR/pi-stream-deck}"
+EXT_DIR="$AGENT_DIR/extensions"
 PLIST="$HOME/Library/LaunchAgents/com.pideck.agent.plist"
 LABEL="com.pideck.agent"
 INSTALL_LAUNCHD=true
@@ -44,15 +46,16 @@ echo "==> CLI -> $HOME/.local/bin/pi-deck"
 mkdir -p "$HOME/.local/bin"
 ln -sf "$ROOT/bin/pi-deck" "$HOME/.local/bin/pi-deck"
 
-mkdir -p "$HOME/.pi-deck/status"
+mkdir -p "$DATA_DIR/status"
+chmod 700 "$DATA_DIR" "$DATA_DIR/status"
 
 if [[ "$INSTALL_LAUNCHD" == true ]]; then
   echo "==> launchd agent $LABEL"
   CMUX_PASSWORD_XML=""
-  if [[ -f "$HOME/.pi-deck/cmux-password" ]]; then
+  if [[ -f "$DATA_DIR/cmux-password" ]]; then
     # Escape plist metacharacters so passwords containing &, <, >, or quotes
     # still produce valid XML.
-    CMUX_PASSWORD="$(python3 -c 'import html, sys; print(html.escape(sys.stdin.read(), quote=True), end="")' < "$HOME/.pi-deck/cmux-password")"
+    CMUX_PASSWORD="$(python3 -c 'import html, sys; print(html.escape(sys.stdin.read(), quote=True), end="")' < "$DATA_DIR/cmux-password")"
     CMUX_PASSWORD_XML="<key>CMUX_SOCKET_PASSWORD</key><string>$CMUX_PASSWORD</string>"
   fi
   cat > "$PLIST" <<PLISTEOF
@@ -70,26 +73,27 @@ if [[ "$INSTALL_LAUNCHD" == true ]]; then
   <key>EnvironmentVariables</key>
   <dict>
     <key>HOMEBREW_PREFIX</key><string>$(brew --prefix 2>/dev/null || echo /opt/homebrew)</string>
+    <key>PI_DECK_HOME</key><string>$DATA_DIR</string>
     $CMUX_PASSWORD_XML
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardErrorPath</key><string>$HOME/.pi-deck/launchd.err.log</string>
-  <key>StandardOutPath</key><string>$HOME/.pi-deck/launchd.out.log</string>
+  <key>StandardErrorPath</key><string>$DATA_DIR/launchd.err.log</string>
+  <key>StandardOutPath</key><string>$DATA_DIR/launchd.out.log</string>
 </dict>
 </plist>
 PLISTEOF
   chmod 600 "$PLIST"
   launchctl unload "$PLIST" 2>/dev/null || true
   launchctl load "$PLIST"
-  echo "    loaded — logs in ~/.pi-deck/"
+  echo "    loaded — logs in $DATA_DIR/"
 fi
 
 echo
 echo "Done. Next:"
 echo "  pi-deck doctor        # check deck + cmux + reporting sessions"
 if [[ "$INSTALL_LAUNCHD" == true ]]; then
-  echo "  daemon runs automatically — logs are in ~/.pi-deck/"
+  echo "  daemon runs automatically — logs are in $DATA_DIR/"
 else
   echo "  pi-deck run -v        # drive the deck in the foreground"
 fi

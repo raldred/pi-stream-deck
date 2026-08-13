@@ -90,12 +90,12 @@ Deck app (and any other app controlling the device) first.
 ### Password-protected cmux sockets
 
 If cmux requires `CMUX_SOCKET_PASSWORD`, put only the password in
-`~/.pi-deck/cmux-password` before running `scripts/install.sh`:
+`~/.pi/agent/pi-stream-deck/cmux-password` before running `scripts/install.sh`:
 
 ```sh
-mkdir -p ~/.pi-deck
-printf '%s' "$CMUX_SOCKET_PASSWORD" > ~/.pi-deck/cmux-password
-chmod 600 ~/.pi-deck/cmux-password
+mkdir -p ~/.pi/agent/pi-stream-deck
+printf '%s' "$CMUX_SOCKET_PASSWORD" > ~/.pi/agent/pi-stream-deck/cmux-password
+chmod 600 ~/.pi/agent/pi-stream-deck/cmux-password
 scripts/install.sh
 ```
 
@@ -104,7 +104,7 @@ The generated launch-agent plist is also restricted to your user (`0600`).
 ## How it works
 
 ```text
-pi session ──(extension)──► ~/.pi-deck/status/<sessionId>.json ──┐
+pi session ──(extension)──► ~/.pi/agent/pi-stream-deck/status/<sessionId>.json ──┐
                                                                  ├─► pideck daemon ──► Stream Deck
 cmux ──`cmux tree --all --json`──► workspaces / surfaces ────────┘        │
                                                                 key press ▼
@@ -142,7 +142,7 @@ network requests.
 
 ## Configuration
 
-`~/.pi-deck/config.json` (all optional):
+`~/.pi/agent/pi-stream-deck/config.json` (all optional):
 
 ```json
 {
@@ -172,8 +172,12 @@ pi-deck selftest                        # paint a demo scene on the device
 ```
 
 The test suite covers the model, layout, status store, rendering, device protocol, and
-daemon topology handling without requiring hardware. `PI_DECK_HOME` relocates the
-status/config/log directory, which is useful when testing against fake sessions.
+daemon topology handling without requiring hardware.
+
+By default, data lives under `~/.pi/agent/pi-stream-deck`. The extension respects
+`PI_CODING_AGENT_DIR` when Pi's agent directory has been relocated. `PI_DECK_HOME` takes
+precedence and relocates only pi-stream-deck's status, config, and logs, which is useful
+when testing against fake sessions.
 
 Contributions and bug reports are welcome through GitHub issues and pull requests.
 

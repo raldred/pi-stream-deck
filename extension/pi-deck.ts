@@ -1,8 +1,9 @@
 /**
  * pi-deck — reports this pi session's status to the pi-deck Stream Deck daemon.
  *
- * Each pi session writes one small JSON file to ~/.pi-deck/status/<id>.json,
- * tagged with the cmux workspace and surface it is running in (from the env
+ * Each pi session writes one small JSON file to
+ * ~/.pi/agent/pi-stream-deck/status/<id>.json, tagged with the cmux workspace
+ * and surface it is running in (from the env
  * cmux sets in every terminal). The daemon watches that directory, groups
  * sessions by workspace, and paints the deck.
  *
@@ -53,7 +54,10 @@ interface Snapshot {
 }
 
 function home(): string {
-  return process.env.PI_DECK_HOME ?? path.join(os.homedir(), ".pi-deck");
+  if (process.env.PI_DECK_HOME) return process.env.PI_DECK_HOME;
+  const agentDir = process.env.PI_CODING_AGENT_DIR
+    ?? path.join(os.homedir(), ".pi", "agent");
+  return path.join(agentDir, "pi-stream-deck");
 }
 
 function statusDir(): string {
