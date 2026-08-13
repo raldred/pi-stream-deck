@@ -20,6 +20,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -65,6 +66,28 @@ function statusDir(): string {
 }
 
 export default function (pi: ExtensionAPI) {
+  const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const daemonEntry = path.join(packageRoot, "node", "daemon.mjs");
+
+  pi.registerCommand("pi-stream-deck", {
+    description: "Set up and inspect the pi-stream-deck service",
+    getArgumentCompletions: (prefix: string) => {
+      const commands = ["setup", "doctor", "status", "selftest", "uninstall"];
+      return commands.filter((value) => value.startsWith(prefix)).map((value) => ({ value, label: value }));
+    },
+    handler: async (args, ctx) => {
+      const command = args.trim() || "doctor";
+      const allowed = new Set(["setup", "doctor", "status", "selftest", "uninstall"]);
+      if (!allowed.has(command)) {
+        ctx.ui.notify("Usage: /pi-stream-deck [setup|doctor|status|selftest|uninstall]", "warning");
+        return;
+      }
+      const result = await pi.exec(process.execPath, [daemonEntry, command], { timeout: 120_000 });
+      const output = (result.stdout || result.stderr || `${command} complete`).trim();
+      ctx.ui.notify(output, result.code === 0 ? "info" : "error");
+    },
+  });
+
   let state: State = "idle";
   let stateSince = Date.now() / 1000;
   let activity: string | undefined;

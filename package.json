@@ -1,6 +1,6 @@
 {
   "name": "pi-stream-deck",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Stream Deck Mini status board and remote control for Pi agents running in cmux",
   "license": "MIT",
   "repository": {
@@ -14,6 +14,13 @@
     "cmux",
     "coding-agent"
   ],
+  "scripts": {
+    "test": "node --test node/tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@elgato-stream-deck/node": "^7.6.3",
+    "@napi-rs/canvas": "^1.0.5"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },
