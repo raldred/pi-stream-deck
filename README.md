@@ -156,21 +156,13 @@ network requests.
 
 ## Configuration
 
-`~/.pi/agent/pi-stream-deck/config.json` (all optional):
+Configuration is optional. By default, pi-stream-deck uses a brightness of 60%, shows all
+cmux workspaces, focuses single-agent workspaces directly, and returns from the agents view
+after 25 seconds.
 
-```json
-{
-  "brightness": 60,
-  "poll_interval": 1.0,
-  "topology_interval": 3.0,
-  "topology_grace": 20.0,
-  "agents_view_timeout": 25.0,
-  "only_with_agents": false,
-  "focus_single_agent_directly": true
-}
-```
-
-`only_with_agents: true` hides idle cmux workspaces (denser, but key positions move around).
+See the **[configuration guide](docs/configuration.md)** for every setting, file-location
+rules, environment variables, password-protected cmux sockets, restarting the daemon, and
+troubleshooting.
 
 ## Development
 
