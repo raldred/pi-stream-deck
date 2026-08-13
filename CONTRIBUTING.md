@@ -1,116 +1,76 @@
 # Contributing
 
-Contributions, bug reports, and ideas are welcome. Please open a GitHub issue before a
-large change so the approach can be discussed before significant work begins.
+Contributions, bug reports, and ideas are welcome. Open an issue before a large change so
+the approach can be discussed first.
 
 ## Development setup
-
-pi-stream-deck requires macOS for cmux and physical-device integration, but its automated
-test suite runs without a Stream Deck.
 
 ```sh
 git clone https://github.com/raldred/pi-stream-deck.git
 cd pi-stream-deck
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest tests -q
+npm install
+npm test
 ```
 
-Runtime dependencies are listed in `requirements.txt`; test-only dependencies belong in
-`requirements-dev.txt`.
-
-## Useful commands
-
-After running `scripts/install.sh --no-launchd`, these commands are useful while developing:
-
-```sh
-pi-deck status                          # joined workspace/agent model as JSON
-pi-deck scene                           # key specs for the workspace overview
-pi-deck scene agents <workspace-uuid>   # key specs for an agents view
-pi-deck selftest                        # paint a demo scene on a connected deck
-pi-deck run -v                          # run the daemon with console logging
-pi-deck doctor                          # check device, cmux, and session reporting
-```
-
-Set `PI_DECK_HOME` to isolate development data from your normal installation:
-
-```sh
-export PI_DECK_HOME="$(mktemp -d)"
-pi-deck status
-```
+The automated tests do not require a Stream Deck. Runtime dependencies are ordinary npm
+packages with prebuilt macOS binaries; no Python or Homebrew libraries are required.
 
 ## Project structure
 
 | Path | Responsibility |
 |---|---|
-| `extension/pi-deck.ts` | Pi lifecycle extension and session status reporter |
-| `pideck/` | Python daemon, model, layout, rendering, and device integration |
-| `tests/` | Hardware-free pytest suite |
-| `scripts/install.sh` | User installation and launchd setup |
-| `package.json` | Pi package manifest and release version |
+| `extension/pi-deck.ts` | Pi lifecycle reporter and `/pi-stream-deck` command |
+| `node/core.mjs` | Paths, models, status store, layout, and cmux integration |
+| `node/render.mjs` | Canvas-based key rendering |
+| `node/device.mjs` | Stream Deck transport, animation, and key presses |
+| `node/daemon.mjs` | Daemon loop, diagnostics, and launchd setup |
+| `node/tests/` | Hardware-free Node test suite |
 | `assets/` | README preview images |
-| `docs/` | User configuration and architecture documentation |
+| `docs/` | Configuration and architecture documentation |
 
-For the runtime architecture and data flow, read [How it works](docs/how-it-works.md).
+See [How it works](docs/how-it-works.md) for the runtime architecture.
 
-## Testing
+## Testing local extension changes
 
-Run the complete suite before submitting a pull request:
-
-```sh
-.venv/bin/python -m pytest tests -q
-bash -n scripts/install.sh bin/pi-deck
-```
-
-The tests cover:
-
-- agent/workspace state and priority
-- subagent attachment and roll-up
-- cmux topology joining and outage handling
-- six-key pagination and input actions
-- Pillow rendering
-- Stream Deck protocol behaviour with fake devices
-- configuration and data-directory resolution
-
-Add or update tests for behavioural changes. Hardware-specific fixes should still include a
-unit test around the smallest testable boundary where possible.
-
-## Testing with hardware
-
-Only one application can own a Stream Deck at a time. Quit Elgato's Stream Deck software
-and stop the installed launch agent before starting a development daemon:
-
-```sh
-launchctl unload ~/Library/LaunchAgents/com.pideck.agent.plist 2>/dev/null || true
-pi-deck run -v
-```
-
-Restore the normal launchd installation afterwards with:
-
-```sh
-scripts/install.sh
-```
-
-The normal installer pins the extension to a tagged release. To test local changes to
-`extension/pi-deck.ts`, remove the installed package temporarily and load the file directly:
+Remove the released package temporarily and load the checkout directly:
 
 ```sh
 pi remove git:github.com/raldred/pi-stream-deck
-pi -e ./extension/pi-deck.ts
+pi -e .
 ```
 
-Start a new Pi process after each extension change, or use `/reload`. Run
-`scripts/install.sh` afterwards to restore the release package.
+Use `/reload` after changing `extension/pi-deck.ts`. Restore the release package when you
+are done.
+
+## Hardware testing
+
+Only one application can own a Stream Deck at a time. Quit Elgato's software, then load the
+local extension and run:
+
+```text
+/pi-stream-deck setup
+/pi-stream-deck doctor
+/pi-stream-deck selftest
+```
+
+Remove the development launch agent before deleting or moving the checkout:
+
+```text
+/pi-stream-deck uninstall
+```
 
 ## Pull requests
 
-Keep pull requests focused and include:
+Before submitting:
 
-1. A short explanation of the user-visible change.
-2. Tests for new or changed behaviour.
-3. Documentation updates when configuration, installation, or controls change.
-4. Confirmation that the test suite passes.
+```sh
+npm test
+node --check node/core.mjs
+node --check node/render.mjs
+node --check node/device.mjs
+node --check node/daemon.mjs
+```
 
-Please do not include session status files, local configuration, logs, virtual environments,
-or credentials. These are already covered by the repository's ignore rules where they can
-occur inside the checkout.
+Keep pull requests focused, add tests for behavioural changes, and update documentation
+when configuration, installation, or controls change. Never commit status files, local
+configuration, logs, or credentials.

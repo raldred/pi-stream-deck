@@ -1,7 +1,7 @@
 # Configuration
 
-pi-stream-deck works without a configuration file. Add one only when you want to change
-the display, polling, navigation, or workspace filtering behaviour.
+pi-stream-deck works without a configuration file. Add one only to change display,
+polling, navigation, or workspace filtering behaviour.
 
 ## Configuration file
 
@@ -11,13 +11,13 @@ The default path is:
 ~/.pi/agent/pi-stream-deck/config.json
 ```
 
-The directory follows Pi's configured agent directory. The complete resolution order is:
+Resolution order:
 
-1. `$PI_DECK_HOME/config.json` when `PI_DECK_HOME` is set.
-2. `$PI_CODING_AGENT_DIR/pi-stream-deck/config.json` when Pi's agent directory is set.
-3. `~/.pi/agent/pi-stream-deck/config.json` otherwise.
+1. `$PI_DECK_HOME/config.json`
+2. `$PI_CODING_AGENT_DIR/pi-stream-deck/config.json`
+3. `~/.pi/agent/pi-stream-deck/config.json`
 
-The file must contain a JSON object. You only need to include values you want to override:
+Only include values you want to override:
 
 ```json
 {
@@ -32,95 +32,83 @@ The file must contain a JSON object. You only need to include values you want to
 }
 ```
 
-## Settings
-
 | Setting | Type | Default | Description |
 |---|---:|---:|---|
 | `brightness` | integer | `60` | Stream Deck brightness from `0` to `100`. |
-| `poll_interval` | seconds | `1.0` | How often the daemon reads session status files and refreshes the scene. Lower values react faster but do more work. |
-| `topology_interval` | seconds | `3.0` | How often the daemon asks cmux for its current windows, workspaces, and surfaces. |
-| `topology_grace` | seconds | `20.0` | How long the last good cmux topology remains visible during an outage. After this, stale workspaces are removed. |
-| `agents_view_timeout` | seconds | `25.0` | Time after the last key press before an agents view returns to the workspace overview. Set to `0` to disable automatic return. |
-| `only_with_agents` | boolean | `false` | Hide cmux workspaces that do not contain a reporting Pi session. This creates a denser view, but key positions can move. |
-| `focus_single_agent_directly` | boolean | `true` | When a workspace has one agent, pressing it focuses that agent immediately. Set to `false` to always open the agents view first. |
-| `reconnect_interval` | seconds | `3.0` | Delay before retrying when the Stream Deck is absent, busy, or disconnected. |
+| `poll_interval` | seconds | `1.0` | Status-file and scene refresh frequency. |
+| `topology_interval` | seconds | `3.0` | How often the daemon refreshes cmux topology. |
+| `topology_grace` | seconds | `20.0` | How long the last good topology survives a cmux interruption. |
+| `agents_view_timeout` | seconds | `25.0` | Delay before returning to the workspace overview; `0` disables it. |
+| `only_with_agents` | boolean | `false` | Hide cmux workspaces without a reporting Pi session. |
+| `focus_single_agent_directly` | boolean | `true` | Focus a workspace's sole agent without opening the agents view. |
+| `reconnect_interval` | seconds | `3.0` | Delay before retrying an absent or disconnected Stream Deck. |
 
-Configuration is read when the daemon starts; it is not hot-reloaded.
+Configuration is read when the daemon starts. Restart it after editing:
 
-### Restart after changing configuration
-
-For the default launchd installation:
-
-```sh
-launchctl kickstart -k "gui/$(id -u)/com.pideck.agent"
+```text
+/pi-stream-deck setup
 ```
 
-If you used `scripts/install.sh --no-launchd`, stop the foreground daemon with `Ctrl-C`
-and run it again:
+## Pi commands
 
-```sh
-pi-deck run -v
+```text
+/pi-stream-deck setup       install or refresh launchd and start the daemon
+/pi-stream-deck doctor      check package, daemon, deck, cmux, and reporters
+/pi-stream-deck status      show the joined workspace and agent model
+/pi-stream-deck selftest    paint a demonstration scene for eight seconds
+/pi-stream-deck uninstall   stop the daemon and remove its launchd service
 ```
+
+`uninstall` removes the service but leaves configuration and status data intact. Remove the
+Pi package separately with `pi remove git:github.com/raldred/pi-stream-deck` when desired.
 
 ## Environment variables
 
 | Variable | Purpose |
 |---|---|
-| `PI_CODING_AGENT_DIR` | Relocates Pi's complete global agent directory. pi-stream-deck stores its data in a `pi-stream-deck/` child directory. |
-| `PI_DECK_HOME` | Overrides only pi-stream-deck's config, status, and log directory. It takes precedence over `PI_CODING_AGENT_DIR`. |
-| `PI_DECK_CMUX_BIN` | Overrides the path to the `cmux` executable. Normally it is found on `PATH` or inside `/Applications/cmux.app`. |
-| `CMUX_SOCKET_PASSWORD` | Password used to communicate with a password-protected cmux socket. See below for launchd setup. |
+| `PI_CODING_AGENT_DIR` | Relocates Pi's global agent directory. |
+| `PI_DECK_HOME` | Overrides only pi-stream-deck's config, status, and logs. |
+| `PI_DECK_CMUX_BIN` | Overrides the path to the cmux executable. |
+| `CMUX_SOCKET_PASSWORD` | Password for a protected cmux socket. |
 
-`PI_DECK_HOME` must resolve to the same directory for both the Pi extension and daemon. The
-installer handles this for launchd by writing the resolved path into its plist.
+`PI_DECK_HOME` must resolve to the same directory for the extension and daemon. The setup
+command writes the resolved path into the launchd plist.
 
 ## Password-protected cmux sockets
 
-Launchd does not inherit your interactive shell environment. If cmux uses
-`CMUX_SOCKET_PASSWORD`, store only the password in the pi-stream-deck data directory before
-installing:
+Launchd does not inherit your shell environment. Save the password before setup:
 
 ```sh
 mkdir -p ~/.pi/agent/pi-stream-deck
 printf '%s' "$CMUX_SOCKET_PASSWORD" > ~/.pi/agent/pi-stream-deck/cmux-password
 chmod 600 ~/.pi/agent/pi-stream-deck/cmux-password
-scripts/install.sh
 ```
 
-When `PI_CODING_AGENT_DIR` or `PI_DECK_HOME` is set, place `cmux-password` in the resolved
-pi-stream-deck data directory instead. The installer XML-escapes the value, writes it into
-the launchd environment, and restricts the generated plist to your user (`0600`).
-
-For a foreground daemon, export `CMUX_SOCKET_PASSWORD` normally before running
-`pi-deck run`.
+Then run `/pi-stream-deck setup`. When `PI_CODING_AGENT_DIR` or `PI_DECK_HOME` is set, put
+`cmux-password` in the resolved data directory instead.
 
 ## Data and logs
-
-The resolved data directory contains:
 
 ```text
 pi-stream-deck/
 ├── config.json
 ├── cmux-password          # optional
+├── daemon.pid
 ├── status/                # one heartbeat file per Pi session
-├── pideck.log             # daemon log
+├── pideck.log
 ├── launchd.out.log
 └── launchd.err.log
 ```
 
-The installer restricts the data and status directories to your user (`0700`). Session
-status files contain local metadata such as the working directory, branch, model, activity,
-and cmux surface identifiers; they are not sent over the network.
+Status files contain local metadata such as working directory, branch, model, activity,
+and cmux surface identifiers. Nothing is sent over the network.
 
-Use these commands when troubleshooting:
+Troubleshooting starts with:
 
-```sh
-pi-deck doctor
-pi-deck status
-pi-deck scene
-tail -f ~/.pi/agent/pi-stream-deck/pideck.log
-tail -f ~/.pi/agent/pi-stream-deck/launchd.err.log
+```text
+/pi-stream-deck doctor
+/pi-stream-deck status
 ```
 
-If the config file is invalid JSON, the daemon ignores it, uses defaults, and writes a
-warning to `pideck.log`.
+For daemon errors, inspect `~/.pi/agent/pi-stream-deck/pideck.log` and
+`launchd.err.log`. Invalid JSON configuration is ignored and defaults are used.

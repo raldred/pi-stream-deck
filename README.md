@@ -66,74 +66,53 @@ returns to the workspace view on its own after about 25 seconds.
 - An Elgato Stream Deck Mini (the six-key model)
 - [pi](https://github.com/earendil-works/pi-coding-agent)
 - [cmux](https://cmux.com)
-- Python 3
-- [Homebrew](https://brew.sh) (the installer uses it to install `hidapi`)
+- Node.js 18.18 or newer (provided by a current Pi installation)
 
 The layout and rendering code assumes six keys. Other Stream Deck models have not yet been
 tested.
 
 ## Install
 
-pi-stream-deck has two parts: a standard Pi extension that reports session state and a
-companion Python daemon that drives the hardware.
-
-### Pi extension only
-
-Install the released extension using Pi's package manager:
+Install the self-contained package using Pi's package manager:
 
 ```sh
-pi install git:github.com/raldred/pi-stream-deck@v0.0.1
+pi install git:github.com/raldred/pi-stream-deck@v0.1.0
 ```
 
-This is the standard way to add the extension to Pi. On its own, it writes session status
-but does not drive a Stream Deck.
+Start a new Pi session (or run `/reload`), quit Elgato's Stream Deck app, then install and
+start the bundled launchd service:
 
-### Complete Stream Deck setup
-
-The daemon, CLI, Python environment, and launchd service also need files from the release,
-so the complete setup uses a release checkout:
-
-```sh
-git clone --branch v0.0.1 --depth 1 https://github.com/raldred/pi-stream-deck.git
-cd pi-stream-deck
-scripts/install.sh
+```text
+/pi-stream-deck setup
 ```
 
-The installer runs the same `pi install` command for the matching release, installs
-`hidapi` with Homebrew, creates a project-local Python virtual environment, links `pi-deck`
-into `~/.local/bin/`, and creates a launch agent so the daemon starts automatically. The
-checkout is for the companion daemon—not for loading the Pi extension directly.
+No repository checkout, Python environment, Homebrew dependency, or shell PATH changes are
+required. The package contains the session reporter, Node daemon, hardware driver, and
+renderer.
 
-To install without the launch agent and run the daemon yourself:
+Useful commands inside Pi:
 
-```sh
-scripts/install.sh --no-launchd
+```text
+/pi-stream-deck doctor
+/pi-stream-deck status
+/pi-stream-deck selftest
+/pi-stream-deck uninstall
 ```
 
-Make sure `~/.local/bin` is on your `PATH`, then check the installation:
-
-```sh
-pi-deck doctor    # deck? cmux? any sessions reporting?
-pi-deck run -v    # drive the deck in the foreground (if not using launchd)
-```
-
-Start a **new** Pi session for the extension to load; `/reload` also works in an existing
-session. The Stream Deck can only be driven by one app at a time, so quit Elgato's Stream
-Deck app (and any other app controlling the device) first.
+The Stream Deck can only be controlled by one application at a time. Quit Elgato's Stream
+Deck app and any other software using the device before setup.
 
 ### Password-protected cmux sockets
 
-If cmux requires `CMUX_SOCKET_PASSWORD`, put only the password in
-`~/.pi/agent/pi-stream-deck/cmux-password` before running `scripts/install.sh`:
+If cmux requires `CMUX_SOCKET_PASSWORD`, save it before running `/pi-stream-deck setup`:
 
 ```sh
 mkdir -p ~/.pi/agent/pi-stream-deck
 printf '%s' "$CMUX_SOCKET_PASSWORD" > ~/.pi/agent/pi-stream-deck/cmux-password
 chmod 600 ~/.pi/agent/pi-stream-deck/cmux-password
-scripts/install.sh
 ```
 
-The generated launch-agent plist is also restricted to your user (`0600`).
+The generated launch-agent plist is restricted to your user (`0600`).
 
 ## Configuration
 
