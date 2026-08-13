@@ -10,6 +10,20 @@ Turn an Elgato Stream Deck Mini into a live status board and remote control for
 > The project is named **pi-stream-deck**; its command and local configuration keep the
 > shorter `pi-deck` name.
 
+## Preview
+
+<p align="center">
+  <img src="assets/stream-deck-preview.png" alt="Stream Deck Mini showing the pi workspace overview" width="720">
+  <br>
+  <em>Workspace overview</em>
+</p>
+
+<p align="center">
+  <img src="assets/stream-deck-agents-preview.png" alt="Stream Deck Mini showing agents and subagents within a workspace" width="720">
+  <br>
+  <em>Agents within a workspace, including active subagents</em>
+</p>
+
 ## What it does
 
 **Top level: your cmux workspaces.** One key per workspace, in sidebar order, so key
