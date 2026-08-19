@@ -1,6 +1,6 @@
 {
   "name": "pi-stream-deck",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stream Deck Mini status board and remote control for Pi agents running in cmux",
   "license": "MIT",
   "repository": {
